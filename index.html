@@ -124,14 +124,14 @@ svg{max-width:100%}
 @keyframes sl{0%{left:-40%}100%{left:100%}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
-.set{grid-template-columns:28px 1fr 1fr 44px 44px}
+.set{grid-template-columns:28px minmax(0,1fr) minmax(0,1fr)}
 .set button,.set-cardio button{margin:0}
 .set-cardio{display:grid;grid-template-columns:1fr 100px 44px 44px;gap:6px;align-items:center}
 .set-rest-info{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--mut);margin-top:4px;padding-left:34px;min-height:22px}
 .timer{display:flex;align-items:center;justify-content:space-between;background:var(--acs);color:var(--ac);padding:10px 14px;border-radius:12px;margin:8px 0;font-weight:700;font-size:17px}
 .timer.hit{background:var(--ok);color:#fff}
 .timer button{width:auto;margin:0;padding:6px 12px;background:var(--card);color:var(--tx);font-size:14px}
-.ftm{padding:0 4px 0 10px;font-weight:700;font-size:15px;color:var(--ac);white-space:nowrap;flex:none}.ftm.hit{color:var(--ok)}
+.ftm{padding:0 4px 0 10px;font-weight:700;font-size:15px;color:var(--ac);white-space:nowrap;flex:none}.ftm.hit{color:var(--ok)}.ftm.low{color:var(--bad)}
 .ghost{width:auto;background:none;color:var(--mut);padding:6px 10px;margin:0;font-size:14px}
 svg.ch{width:100%;height:auto}
 .tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -252,7 +252,8 @@ var IC={
  play:'<path d="M8 5l11 7-11 7z"/>',
  trash:'<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
  pen:'<path d="M4 20l4-1 11-11-3-3L5 16z"/>',
- check:'<path d="M5 12.5l4.5 4.5L19 7"/>'
+ check:'<path d="M5 12.5l4.5 4.5L19 7"/>',
+ plus:'<path d="M12 5v14M5 12h14"/>',minus:'<path d="M5 12h14"/>',next:'<path d="M5 12h14M13 6l6 6-6 6"/>'
 };
 function ic(n,s){return'<svg class="ic" width="'+(s||22)+'" height="'+(s||22)+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+IC[n]+'</svg>'}
 var T0=Date.now();
@@ -477,13 +478,15 @@ function tickAll(){
     if(S.alertOn&&!DATA.alerted&&secs>=S.alertMin*60){DATA.alerted=true;showToast('⏱ Llevas '+S.alertMin+' min entrenando',6000);buzz([300,150,300])}
   }
   var T=DATA.timer;if(!T)return;
-  var el=Math.floor((Date.now()-T.start)/1000),hit=el>=T.target;
-  if(DATA.draft[T.exIdx]&&DATA.draft[T.exIdx][T.setIdx])DATA.draft[T.exIdx][T.setIdx].restSec=el;
-  var a=document.getElementById('tm-sec'),f=document.getElementById('fab-t'),b=document.getElementById('tm-box');
-  if(a)a.textContent=fmtR(el)+' / '+fmtR(T.target);
-  if(f){f.textContent='⏱ '+fmtR(el);f.classList.toggle('hit',hit)}
-  if(b)b.classList.toggle('hit',hit);
-  if(hit&&!T.fired){T.fired=true;if(S.sound)beep();buzz([200,100,200]);showToast('✅ Descanso terminado')}
+  var st=ringState(T);
+  if(DATA.draft[T.exIdx]&&DATA.draft[T.exIdx][T.setIdx])DATA.draft[T.exIdx][T.setIdx].restSec=Math.floor((Date.now()-T.start)/1000);
+  var box=document.getElementById('tm-box'),arc=document.getElementById('rg-arc'),num=document.getElementById('rg-num'),sub=document.getElementById('rg-sub'),f=document.getElementById('fab-t');
+  if(box){box.classList.toggle('low',st.low);box.classList.toggle('done',st.hit)}
+  if(arc)arc.setAttribute('stroke-dashoffset',st.off);
+  if(num)num.textContent=st.num;
+  if(sub)sub.textContent=st.sub;
+  if(f){f.textContent=st.hit?'✓ Listo':'⏱ '+fmtR(st.rem);f.classList.toggle('hit',st.hit);f.classList.toggle('low',st.low)}
+  if(st.hit&&!T.fired){T.fired=true;if(S.sound)beep();buzz([200,100,200]);showToast('✅ Descanso terminado')}
 }
 setInterval(tickAll,500);
 
@@ -503,9 +506,40 @@ function toggleSet(i,j){
   initAudio();var s=DATA.draft[i][j],T=DATA.timer;
   if(T&&T.exIdx===i&&T.setIdx===j){stopTimer();return}
   s.done=!s.done;
-  if(s.done)startTimer(i,j,restFor(DATA.routines[DATA.rid].ex[i]));
+  if(s.done){DATA.pop=i+'-'+j;buzz(30);startTimer(i,j,restFor(DATA.routines[DATA.rid].ex[i]));
+    setTimeout(function(){var b=document.getElementById('tm-box');if(b&&b.scrollIntoView)b.scrollIntoView({behavior:'smooth',block:'center'})},90)}
   else{stopTimer(true);render()}
 }
+var RC=439.8;
+function ringState(T){
+  var el=Math.floor((Date.now()-T.start)/1000),rem=T.target-el,hit=rem<=0,low=!hit&&rem<15;
+  return{rem:rem,hit:hit,low:low,off:hit?0:(RC*(1-rem/T.target)).toFixed(1),num:hit?'Listo':fmtR(rem),sub:hit?'+'+fmtR(-rem)+' extra':'Descanso · serie '+(T.setIdx+1)};
+}
+function restHtml(T,last){
+  var st=ringState(T);
+  return'<div class="rest'+(st.low?' low':'')+(st.hit?' done':'')+'" id="tm-box"><div class="ringw"><svg viewBox="0 0 160 160"><circle class="rg0" cx="80" cy="80" r="70"/><circle class="rg1" id="rg-arc" cx="80" cy="80" r="70" transform="rotate(-90 80 80)" stroke-dasharray="439.8" stroke-dashoffset="'+st.off+'"/></svg><div class="rgt"><b id="rg-num">'+st.num+'</b><span id="rg-sub">'+st.sub+'</span></div></div><button class="p" style="margin:0 0 8px" onclick="nextSet()">'+ic('plus',18)+'Siguiente serie</button><button style="margin:0" onclick="nextEx()">'+(last?'Guardar sesión':'Siguiente ejercicio')+ic('next',18)+'</button></div>';
+}
+function stepper(k,i,j,val,ph,inm){
+  return'<div class="stp"><button class="sb" aria-label="Menos" onclick="step('+i+','+j+',\''+k+'\',-1)">'+ic('minus',18)+'</button><input id="in-'+k+'-'+i+'-'+j+'" type="number" inputmode="'+inm+'" placeholder="'+ph+'" value="'+esc(val)+'" oninput="setVal('+i+','+j+',\''+k+'\',this.value)"><button class="sb" aria-label="Más" onclick="step('+i+','+j+',\''+k+'\',1)">'+ic('plus',18)+'</button></div>';
+}
+function step(i,j,k,dir){
+  var n=DATA.routines[DATA.rid].ex[i],s=DATA.draft[i][j],v=parseFloat(String(s[k]).replace(',','.')),amt=k==='w'?DATA.settings.inc:1;
+  if(isNaN(v)){
+    var ls=lastSets(n),p=ls&&ls[Math.min(j,ls.length-1)],sg=k==='w'?suggestion(n):null,base=0;
+    if(k==='w')base=sg&&+sg.w>0?+sg.w:(p&&+p.w>0?+p.w:0);else if(k==='r')base=p&&+p.r>0?+p.r:0;
+    v=base;if(base>0)amt=0;
+  }
+  v=Math.max(0,Math.round((v+dir*amt)*100)/100);
+  var el=document.getElementById('in-'+k+'-'+i+'-'+j);if(el)el.value=v;
+  setVal(i,j,k,String(v));buzz(10);
+}
+function scrollSet(i,j){setTimeout(function(){var e=document.getElementById('sc-'+i+'-'+j);if(e&&e.scrollIntoView)e.scrollIntoView({behavior:'smooth',block:'center'})},60)}
+function nextSet(){
+  var T=DATA.timer;if(!T)return;var i=T.exIdx,j=T.setIdx;stopTimer(true);
+  if(j+1>=DATA.draft[i].length)addSet(i);else render();
+  scrollSet(i,j+1);
+}
+function nextEx(){stopTimer(true);fabNext()}
 function toggleCardio(i,j){DATA.draft[i][j].done=!DATA.draft[i][j].done;render()}
 function addSet(i){
   var d=DATA.draft[i],prev=d[d.length-1];
@@ -575,7 +609,7 @@ function render(){
   else if(DATA.tab==='p')app.innerHTML=viewProgress();
   else if(DATA.tab==='h')app.innerHTML=viewHistory();
   else app.innerHTML=viewSettings();
-  renderFab();
+  DATA.pop='';renderFab();
   if(DATA.inSession)saveDraft();
 }
 function renderFab(){
@@ -586,7 +620,7 @@ function renderFab(){
   var nextLbl=last?'Guardar sesión':'Siguiente →',main,alt=null;
   if(wantNext){main=[nextLbl,'fabNext()'];if(!cardio)alt=['+','addSet('+i+')','Añadir serie']}
   else{main=['+ Añadir serie','addSet('+i+')'];alt=[last?'✓':'→','fabNext()',last?'Guardar sesión':'Siguiente ejercicio']}
-  f.innerHTML='<div class="pill">'+(DATA.timer?'<span class="ftm" id="fab-t">⏱ 0:00</span>':'')+'<button class="fmain" onclick="'+main[1]+'">'+main[0]+'</button>'+(alt?'<button class="fsec" aria-label="'+alt[2]+'" onclick="'+alt[1]+'">'+alt[0]+'</button>':'')+'</div>';
+  f.innerHTML='<div class="pill">'+(DATA.timer?'<span class="ftm" id="fab-t">⏱ '+fmtR(Math.max(0,ringState(DATA.timer).rem))+'</span>':'')+'<button class="fmain" onclick="'+main[1]+'">'+main[0]+'</button>'+(alt?'<button class="fsec" aria-label="'+alt[2]+'" onclick="'+alt[1]+'">'+alt[0]+'</button>':'')+'</div>';
   f.style.display='block';
 }
 function initDragAndDrop(rIdx){
@@ -633,14 +667,13 @@ function viewTrain(){
       h+='<button onclick="copyLast('+i+')" style="margin:0 0 8px;padding:8px;font-size:15px">↻ Usar series de la última sesión</button>';
     }
     if(!cardio)h+='<div class="row" style="margin-bottom:6px"><span class="hint" style="white-space:nowrap;margin:0">Rango reps</span><input type="number" value="'+rg[0]+'" onchange="setRange('+i+',0,this.value)"><input type="number" value="'+rg[1]+'" onchange="setRange('+i+',1,this.value)"></div>';
-    if(!cardio&&T&&T.exIdx===i)h+='<div class="timer'+(Date.now()-T.start>=T.target*1000?' hit':'')+'" id="tm-box"><span>⏱ Descanso: <span id="tm-sec">'+fmtR(Math.floor((Date.now()-T.start)/1000))+' / '+fmtR(T.target)+'</span></span><button onclick="stopTimer()">Pausar</button></div>';
     d.forEach(function(s,j){
-      var b=badgeHtml(n,j,s,cardio);
-      if(cardio){
-        h+='<div class="set-container"><div class="set-cardio"><span class="hint" style="margin:0">Minutos:</span><input type="number" inputmode="decimal" placeholder="min" value="'+esc(s.minutes)+'" oninput="setVal('+i+','+j+',\'minutes\',this.value)"><button class="'+(s.done?'p':'')+'" onclick="toggleCardio('+i+','+j+')">✓</button><button class="x" onclick="delSet('+i+','+j+')">✕</button></div><div class="set-rest-info"><span></span><span class="bdg" id="bd-'+i+'-'+j+'">'+b+'</span></div></div>';
-      }else{
-        var on=T&&T.exIdx===i&&T.setIdx===j;
-        h+='<div class="set-container"><div class="set"><b style="text-align:center">'+(j+1)+'</b><input type="number" inputmode="decimal" placeholder="kg" value="'+esc(s.w)+'" oninput="setVal('+i+','+j+',\'w\',this.value)"><input type="number" inputmode="numeric" placeholder="reps" value="'+esc(s.r)+'" oninput="setVal('+i+','+j+',\'r\',this.value)"><button class="'+(s.done?'p':'')+'" onclick="toggleSet('+i+','+j+')">'+(on?'⏸':'✓')+'</button><button class="x" onclick="delSet('+i+','+j+')">✕</button></div><div class="set-rest-info"><span>Descanso: '+(s.restSec||0)+'s</span><span class="bdg" id="bd-'+i+'-'+j+'">'+b+'</span></div></div>';
+      var b=badgeHtml(n,j,s,cardio),cls='set-container'+(s.done?' dn':'')+(DATA.pop===i+'-'+j?' pop':'');
+      var foot='<div class="set-foot"><button class="dbtn '+(s.done?'on':'p')+'" onclick="'+(cardio?'toggleCardio':'toggleSet')+'('+i+','+j+')">'+ic('check',18)+(s.done?'Hecha':'Completar')+'</button><span class="mu2 grow">'+(cardio?'':'Descanso: '+(s.restSec||0)+'s')+'</span><span class="bdg" id="bd-'+i+'-'+j+'">'+b+'</span><button class="x" onclick="delSet('+i+','+j+')" aria-label="Quitar serie">'+ic('trash',18)+'</button></div>';
+      if(cardio)h+='<div class="'+cls+'" id="sc-'+i+'-'+j+'"><div class="set" style="grid-template-columns:28px minmax(0,1fr)"><b class="sn">'+(j+1)+'</b>'+stepper('minutes',i,j,s.minutes,'min','decimal')+'</div>'+foot+'</div>';
+      else{
+        h+='<div class="'+cls+'" id="sc-'+i+'-'+j+'"><div class="set"><b class="sn">'+(j+1)+'</b>'+stepper('w',i,j,s.w,'kg','decimal')+stepper('r',i,j,s.r,'reps','numeric')+'</div>'+foot+'</div>';
+        if(T&&T.exIdx===i&&T.setIdx===j)h+=restHtml(T,i===r.ex.length-1);
       }
     });
     h+='</div>';
