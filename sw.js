@@ -1,4 +1,4 @@
-var CACHE = 'gymlog-v1';
+var CACHE = 'gymlog-v2';
 var SHELL = ['./', 'index.html', 'config.js', 'manifest.json', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', function (e) {
