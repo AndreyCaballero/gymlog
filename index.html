@@ -186,10 +186,14 @@ button{font-size:14px;padding:10px 12px;border-radius:10px}
 
 #skip{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:2400;display:none;align-items:center;justify-content:center;padding:20px}
 .skb{justify-content:flex-start;background:var(--in);color:var(--tx);border:1px solid var(--bd);margin:0 0 8px;text-align:left}
-.skb:before{content:'';width:12px;height:12px;border-radius:50%;background:var(--c);flex:none}
+.skb svg{color:var(--c);flex:none}
 .cal .k{border-bottom:3px solid var(--kc);background:color-mix(in srgb,var(--kc) 18%,transparent);color:var(--tx)}
 .cal .pk{cursor:pointer}
-.lg{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--mut);margin-top:10px}.lg i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
+.lg{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--mut);margin-top:10px}.lg i{display:inline-flex;vertical-align:middle;margin-right:5px}
+.lg{gap:8px 14px}
+.cal div{height:38px;flex-direction:column;gap:2px;line-height:1}
+.cal svg{width:11px;height:11px}
+.cal .k svg{color:var(--kc)}
 </style>
 
 </head>
@@ -312,6 +316,10 @@ var IC={
  trash:'<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
  pen:'<path d="M4 20l4-1 11-11-3-3L5 16z"/>',
  check:'<path d="M5 12.5l4.5 4.5L19 7"/>',
+ rest:'<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
+ flower:'<circle cx="12" cy="12" r="2.2"/><circle cx="12" cy="5.6" r="2.8"/><circle cx="18.1" cy="10.1" r="2.8"/><circle cx="15.8" cy="17.3" r="2.8"/><circle cx="8.2" cy="17.3" r="2.8"/><circle cx="5.9" cy="10.1" r="2.8"/>',
+ sick:'<circle cx="11" cy="12.5" r="8.2"/><path d="M8 10.2h.01M14 10.2h.01" stroke-width="2.6"/><path d="M8.2 15.8h4.4"/><path d="M12.5 15.8l7-4.6" stroke-width="2.4"/><circle cx="20.6" cy="10.4" r="1.3"/>',
+ heart:'<path d="M12 20s-7.5-4.6-7.5-10.2A4.2 4.2 0 0 1 12 7.4a4.2 4.2 0 0 1 7.5 2.4C19.5 15.4 12 20 12 20z"/>',
  plus:'<path d="M12 5v14M5 12h14"/>',minus:'<path d="M5 12h14"/>',next:'<path d="M5 12h14M13 6l6 6-6 6"/>'
 };
 function ic(n,s){return'<svg class="ic" width="'+(s||22)+'" height="'+(s||22)+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+IC[n]+'</svg>'}
@@ -368,8 +376,11 @@ function finishOnb(skip){
   if(!skip)showToast('¡Listo, a entrenar!');
   askSkip();
 }
-var SKIPS=[['Descanso','#4C8DFF'],['Incapacidad o enfermedad','#E5484D'],['Periodo o menstruación','#EC4899'],['Emocional','#F5A623']];
-function skipOpts(){return SKIPS.filter(function(s){return s[0]!=='Periodo o menstruación'||DATA.profile.sex!=='Hombre'})}
+var SKIPS=[['Descanso','#4C8DFF','rest'],['Menstruación','#EC4899','flower'],['Incapacidad','#E5484D','sick'],['Emocional','#F5A623','heart']];
+var SKMAP={'Incapacidad o enfermedad':'Incapacidad','Periodo o menstruación':'Menstruación'};
+function normSkips(o){var r={};Object.keys(o||{}).forEach(function(k){r[k]=SKMAP[o[k]]||o[k]});return r}
+function skipIcon(r){for(var i=0;i<SKIPS.length;i++)if(SKIPS[i][0]===r)return SKIPS[i][2];return'rest'}
+function skipOpts(){return SKIPS.filter(function(s){return s[0]!=='Menstruación'||DATA.profile.sex!=='Hombre'})}
 function skipColor(r){for(var i=0;i<SKIPS.length;i++)if(SKIPS[i][0]===r)return SKIPS[i][1];return'#888'}
 function lblDay(ds){var d=parseD(ds);return['domingo','lunes','martes','miércoles','jueves','viernes','sábado'][d.getDay()]+' '+shortD(d)}
 function askSkip(){
@@ -382,7 +393,7 @@ function askSkip(){
 function openSkip(ds,ask){
   DATA.skipDay=ds;DATA.skipAsk=!!ask;var cur=DATA.skips[ds];
   document.getElementById('skip').innerHTML='<div class="card" style="max-width:380px;margin:0"><h2>'+(ask?'¿Por qué no entrenaste ayer?':'Día sin entrenar')+'</h2><p class="hint">'+lblDay(ds)+'</p>'
-   +skipOpts().map(function(s){return'<button class="skb" style="--c:'+s[1]+(cur===s[0]?';border-color:'+s[1]:'')+'" onclick="setSkip(\''+s[0]+'\')">'+s[0]+'</button>'}).join('')
+   +skipOpts().map(function(s){return'<button class="skb" style="--c:'+s[1]+(cur===s[0]?';border-color:'+s[1]:'')+'" onclick="setSkip(\''+s[0]+'\')">'+ic(s[2],20)+s[0]+'</button>'}).join('')
    +(cur?'<button class="ghost" style="margin:0 auto;display:block" onclick="setSkip(\'\')">Quitar el registro</button>':'')
    +'<button class="ghost" style="margin:4px auto 0;display:block" onclick="closeSkip()">'+(ask?'Omitir':'Cerrar')+'</button></div>';
   document.getElementById('skip').style.display='flex';
@@ -460,7 +471,7 @@ function applyData(json){
     if(d.mode!==undefined)DATA.mode=d.mode;
     if(d.font!==undefined)DATA.font=d.font;
     if(d.zoom)DATA.zoom=+d.zoom;
-    if(d.skips)DATA.skips=d.skips;
+    if(d.skips)DATA.skips=normSkips(d.skips);
     if(d.profile)DATA.profile=Object.assign({},DATA.profile,d.profile);
     applyUI();
   }catch(e){}
@@ -935,9 +946,9 @@ function viewProgress(){
   for(var d=1;d<=dim;d++){
     var ds=pre+p2(d),sk=!set[ds]&&DATA.skips[ds],pk=ds<today()&&!set[ds];
     if(sk)kc[sk]=(kc[sk]||0)+1;
-    h+='<div class="'+(set[ds]?'y':'')+(ds===today()?' td':'')+(sk?' k':'')+(pk?' pk':'')+'"'+(sk?' style="--kc:'+skipColor(sk)+'"':'')+(pk?' onclick="openSkip(\''+ds+'\')"':'')+'>'+d+'</div>';
+    h+='<div class="'+(set[ds]?'y':'')+(ds===today()?' td':'')+(sk?' k':'')+(pk?' pk':'')+'"'+(sk?' style="--kc:'+skipColor(sk)+'"':'')+(pk?' onclick="openSkip(\''+ds+'\')"':'')+'>'+d+(set[ds]?ic('train',11):(sk?ic(skipIcon(sk),11):''))+'</div>';
   }
-  h+='</div><div class="lg">'+SKIPS.filter(function(s){return kc[s[0]]}).map(function(s){return'<span><i style="background:'+s[1]+'"></i>'+s[0]+' · '+kc[s[0]]+'</span>'}).join('')+'<span>Toca un día sin entrenar para anotar el motivo</span></div></div>';
+  h+='</div><div class="lg"><span><i style="color:var(--ac)">'+ic('train',14)+'</i>Días entrenados · '+cnt+'</span>'+skipOpts().map(function(s){return'<span><i style="color:'+s[1]+'">'+ic(s[2],14)+'</i>'+s[0]+' · '+(kc[s[0]]||0)+'</span>'}).join('')+'</div><div class="hint" style="margin:8px 0 0">Toca un día sin entrenar para anotar el motivo</div></div>';
   /* volumen por músculo */
   h+='<div class="card"><h2>Series por músculo</h2><div class="hint">'+(off===0?'Esta semana':'Semana pasada')+' · meta de 10 a 16 series efectivas (principal 1, secundario ½)</div>';
   MAIN.forEach(function(m){var v=w.sets[m]||0;h+='<div class="row" style="margin:7px 0"><span style="width:96px;font-size:14px">'+m+'</span><div class="bar" style="flex:1;margin:0"><i style="width:'+Math.min(100,Math.round(v/16*100))+'%;background:'+(v<10?'var(--warn)':'var(--ac)')+'"></i></div><span style="width:34px;text-align:right;font-size:14px">'+round1(v)+'</span></div>'});
