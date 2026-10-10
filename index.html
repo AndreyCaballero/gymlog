@@ -231,7 +231,7 @@ button{font-size:14px;padding:10px 12px;border-radius:10px}
 var SPREADSHEET_URL="https://docs.google.com/spreadsheets/d/1aO-NaV5SSNqQ3va2GSWIyRDnE3BtdmF7AXqViaNEoBg/edit";
 var HAS_GS=typeof API_URL!=='undefined'&&String(API_URL).indexOf('script.google.com')>-1;
 function api(fn,args){
-  var ctl=typeof AbortController!=='undefined'?new AbortController():null,tm=setTimeout(function(){if(ctl)ctl.abort()},25000);
+  var ctl=typeof AbortController!=='undefined'?new AbortController():null,tm=setTimeout(function(){if(ctl)ctl.abort()},(fn==='getUserData'||fn==='getLogs'||fn==='getCatalogo')?8000:25000);
   return fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({key:API_KEY,fn:fn,args:args}),signal:ctl?ctl.signal:undefined})
    .then(function(r){return r.json()}).then(function(j){clearTimeout(tm);if(!j.ok)throw new Error(j.error||'Error');return j.result},function(e){clearTimeout(tm);throw e});
 }
@@ -496,7 +496,7 @@ function restoreDraft(){
   }catch(e){}
   return false;
 }
-function finishLoad(){if(!restoreDraft())initDraft();render();shortcut();hideSplash();if(!DATA.profile.done&&!DATA.inSession)showOnb();else askSkip()}
+function finishLoad(){if(DATA._ld){render();return}DATA._ld=1;if(!restoreDraft())initDraft();render();shortcut();hideSplash();if(!DATA.profile.done&&!DATA.inSession)showOnb();else askSkip()}
 function cacheLogs(){try{localStorage.setItem('gymlog_logs_'+currentUser,JSON.stringify(DATA.logs.slice(-150)))}catch(e){}}
 function cacheBody(){try{localStorage.setItem('gymlog_body_'+currentUser,JSON.stringify(DATA.body))}catch(e){}}
 function getPending(){try{return JSON.parse(localStorage.getItem('gymlog_pend_'+currentUser))||[]}catch(e){return[]}}
@@ -535,6 +535,7 @@ function loadLocal(){
   loadBody();loadCatalog();
   if(!HAS_GS){setSync('💾 Solo local');loadLogs(90,finishLoad);return}
   setSync('Sincronizando...');
+  setTimeout(function(){if(!DATA._ld){setSync('⚠ Conexión lenta (datos locales)');finishLoad()}},4000);
   GS.run.withSuccessHandler(function(cj){
     if(cj)applyData(cj);
     setSync('☁ Sincronizado');flushPending(function(){loadLogs(90,finishLoad)});
