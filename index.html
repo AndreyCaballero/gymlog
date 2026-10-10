@@ -450,7 +450,7 @@ function loadCatalog(manual){
 function carga(n){return CAT[n]?CAT[n].carga:'Peso externo'}
 function isAsist(n){return carga(n)==='Asistido'}
 function isBW(n){return carga(n)==='Peso corporal'}
-function incFor(n){return CAT[n]&&CAT[n].inc>0?CAT[n].inc:DATA.settings.inc}
+function incFor(n){var S=DATA.settings;if(S.incSet||+S.inc!==2.5)return +S.inc||2.5;return CAT[n]&&CAT[n].inc>0?CAT[n].inc:S.inc}
 function sTxt(name,s){if(s.minutes)return s.minutes+' min';var w=+s.w||0;if(isBW(name)&&!(w>0))return s.r+' reps';if(isAsist(name))return w+' kg asist. × '+s.r;return w+' kg × '+s.r}
 function muscleOf(n){var m=DATA.muscles[n];if(m)return normG(m);return CAT[n]?CAT[n].g:guessMuscle(n)}
 function restFor(n){return DATA.restTimes[n]||DATA.settings.rest}
@@ -1046,7 +1046,7 @@ function delLog(i){var l=DATA.logs[i];showConfirm('Borrar sesión','¿Eliminar e
 function clearHistory(){showConfirm('Borrar Historial','¿Borrar TODO tu historial, también en Google Sheets?',function(){DATA.logs=[];cacheLogs();render();if(HAS_GS)GS.run.withFailureHandler(function(){showToast('No se pudo borrar en Sheets')}).deleteAllLogs(currentUser);showToast('Historial borrado');DATA.skips={};DATA.profile.done=false;saveCloud();showOnb()})}
 
 /* ---------- vista: Ajustes ---------- */
-function setOpt(k,v){DATA.settings[k]=v;saveCloud();if(k==='wake'){if(v&&DATA.inSession)wakeOn();else wakeOff()}render()}
+function setOpt(k,v){DATA.settings[k]=v;if(k==='inc')DATA.settings.incSet=true;saveCloud();if(k==='wake'){if(v&&DATA.inSession)wakeOn();else wakeOff()}render()}
 function tg(k){return'<div class="tg'+(DATA.settings[k]?' on':'')+'" onclick="setOpt(\''+k+'\','+(!DATA.settings[k])+')"><span></span></div>'}
 function selOpt(k,vals,suf,num){
   return'<select onchange="setOpt(\''+k+'\','+(num||'parseInt')+'(this.value))">'+vals.map(function(v){return'<option value="'+v+'"'+(+DATA.settings[k]===v?' selected':'')+'>'+String(v).replace('.',',')+suf+'</option>'}).join('')+'</select>';
