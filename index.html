@@ -392,7 +392,7 @@ function askSkip(){
 }
 function openSkip(ds,ask){
   DATA.skipDay=ds;DATA.skipAsk=!!ask;var cur=DATA.skips[ds];
-  document.getElementById('skip').innerHTML='<div class="card" style="max-width:380px;margin:0"><h2>'+(ask?'¿Por qué no entrenaste ayer?':'Día sin entrenar')+'</h2><p class="hint">'+lblDay(ds)+'</p>'
+  document.getElementById('skip').innerHTML='<div class="card" style="max-width:380px;margin:0"><h2>'+(ask?'¿Por qué no entrenaste ayer?':(ds===today()?'Hoy no entreno: ¿por qué?':'Día sin entrenar'))+'</h2><p class="hint">'+lblDay(ds)+'</p>'
    +skipOpts().map(function(s){return'<button class="skb" style="--c:'+s[1]+(cur===s[0]?';border-color:'+s[1]:'')+'" onclick="setSkip(\''+s[0]+'\')">'+ic(s[2],20)+s[0]+'</button>'}).join('')
    +(cur?'<button class="ghost" style="margin:0 auto;display:block" onclick="setSkip(\'\')">Quitar el registro</button>':'')
    +'<button class="ghost" style="margin:4px auto 0;display:block" onclick="closeSkip()">'+(ask?'Omitir':'Cerrar')+'</button></div>';
@@ -401,12 +401,24 @@ function openSkip(ds,ask){
 function closeSkip(){
   document.getElementById('skip').style.display='none';
   if(DATA.skipAsk){try{localStorage.setItem('gymlog_skipask_'+currentUser,DATA.skipDay)}catch(e){}}
-  DATA.skipAsk=false;
+  DATA.skipAsk=false;DATA.skipDel='';
+}
+function purgeDay(ds){
+  var del=DATA.logs.filter(function(l){return l.date===ds});if(!del.length)return 0;
+  DATA.logs=DATA.logs.filter(function(l){return l.date!==ds});cacheLogs();
+  if(HAS_GS)del.forEach(function(l){GS.run.withFailureHandler(function(){showToast('No se pudo borrar en Sheets')}).deleteSession(currentUser,l.id)});
+  return del.length;
+}
+function noTrainToday(){
+  var t=today(),n=DATA.logs.filter(function(l){return l.date===t}).length;
+  if(n){showConfirm('Ya registraste un entrenamiento hoy','Si eliges un motivo, se borrará el entrenamiento que ya guardaste hoy. ¿Quieres continuar?',function(){openSkip(t,false);DATA.skipDel=t})}
+  else openSkip(t,false);
 }
 function setSkip(r){
+  var purged=0;if(r&&DATA.skipDel===DATA.skipDay)purged=purgeDay(DATA.skipDay);
   if(r)DATA.skips[DATA.skipDay]=r;else delete DATA.skips[DATA.skipDay];
   var ask=DATA.skipAsk;closeSkip();DATA.skipAsk=ask;saveCloud();DATA.skipAsk=false;
-  showToast(r?'Registrado: '+r:'Registro eliminado');render();
+  showToast(r?(purged?'Entrenamiento de hoy borrado. ':'')+'Registrado: '+r:'Registro eliminado');render();
 }
 var T0=Date.now();
 function hideSplash(){var s=document.getElementById('splash');if(!s||s.classList.contains('hide'))return;
@@ -844,10 +856,15 @@ function miniText(n,i,cardio,d,done){
   }
   return i<DATA.active?'– '+esc(n)+': sin series':'○ '+esc(n)+' · pendiente';
 }
+function todayNoTrain(){
+  var t=today(),r=DATA.skips[t];
+  if(r)return'<div class="row" style="margin-top:12px;justify-content:space-between;gap:8px"><span style="color:'+skipColor(r)+';font-weight:700;display:flex;align-items:center;gap:6px">'+ic(skipIcon(r),18)+'Hoy: '+esc(r)+'</span><span><button class="sm" onclick="openSkip(\''+t+'\')">Cambiar</button> <button class="sm" onclick="DATA.skipDay=\''+t+'\';setSkip(\'\')">Quitar</button></span></div><p class="hint" style="margin:6px 0 0">Si decides entrenar, solo inicia y guarda: el motivo se quita solo.</p>';
+  return'<button class="ghost" style="margin:10px auto 0;display:block" onclick="noTrainToday()">Hoy no entreno</button>';
+}
 function viewTrain(){
   if(!DATA.inSession){
     var o=DATA.routines.map(function(r,i){return'<option value="'+i+'"'+(i===DATA.rid?' selected':'')+'>'+esc(r.name)+'</option>'}).join('');
-    return'<h1>¡Hola, '+esc(firstName)+'! 💪</h1>'+goalCard()+'<div class="card"><h2>¿Qué vamos a entrenar hoy?</h2><div class="row" style="margin:12px 0"><select class="grow" onchange="DATA.rid=parseInt(this.value);initDraft()">'+o+'</select></div><button class="p" onclick="startSession()">'+ic('play',18)+'Iniciar entrenamiento</button></div>';
+    return'<h1>¡Hola, '+esc(firstName)+'! 💪</h1>'+goalCard()+'<div class="card"><h2>¿Qué vamos a entrenar hoy?</h2><div class="row" style="margin:12px 0"><select class="grow" onchange="DATA.rid=parseInt(this.value);initDraft()">'+o+'</select></div><button class="p" onclick="startSession()">'+ic('play',18)+'Iniciar entrenamiento</button>'+todayNoTrain()+'</div>';
   }
   var r=DATA.routines[DATA.rid];if(!r)return'<div class="card">Selecciona una rutina válida.</div>';
   var cardio=isCardio(r);if(DATA.draft.length!==r.ex.length)initDraft();
@@ -1093,7 +1110,7 @@ function saveSession(){
     });
   });
   if(!entries.length){showToast('Ingresa datos en al menos una serie.');return}
-  var log={id:sid,date:sd,routine:r.name,entries:entries};DATA.logs.push(log);cacheLogs();
+  var log={id:sid,date:sd,routine:r.name,entries:entries};DATA.logs.push(log);cacheLogs();if(DATA.skips[sd]){delete DATA.skips[sd];saveCloud()}
   saveCloud();DATA.inSession=false;wakeOff();clearDraft();initDraft();
   sendRows(rows,log);
   DATA.tab='h';DATA.edit=null;render();window.scrollTo(0,0);
@@ -1109,3 +1126,4 @@ window.onload=loadLocal;
 <script src="tecnica.js"></script>
 </body>
 </html>
+
