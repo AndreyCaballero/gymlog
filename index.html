@@ -780,8 +780,9 @@ function repeatLog(k){
     DATA.draft[i]=en.sets.map(function(s){return s.minutes?{minutes:s.minutes,done:false}:{w:s.w,r:'',done:false,restSec:0}})});
   saveDraft();render();
 }
+function sessDate(){var t=DATA.sessionStart||Date.now();return Date.now()-t<14*3600000?fmtD(new Date(t)):today()}
 function startSession(){
-  DATA.inSession=true;DATA.sessionStart=Date.now();DATA.alerted=false;
+  DATA.date=today();DATA.inSession=true;DATA.sessionStart=Date.now();DATA.alerted=false;
   initDraft();initAudio();wakeOn();saveDraft();render();
 }
 function endSession(){
@@ -1073,7 +1074,7 @@ function viewSettings(){
 /* ---------- guardar sesión ---------- */
 function saveSession(){
   stopTimer(true);
-  var r=DATA.routines[DATA.rid],cardio=isCardio(r),entries=[],rows=[],prs=[],sid='s'+Date.now();
+  var r=DATA.routines[DATA.rid],cardio=isCardio(r),entries=[],rows=[],prs=[],sid='s'+Date.now(),sd=sessDate();
   r.ex.forEach(function(n,i){
     var bw=isBW(n);
     var sets=DATA.draft[i].filter(function(s){return cardio?+s.minutes>0:(+s.r>0&&(bw||(s.w!==''&&+s.w>=0)))});
@@ -1087,12 +1088,12 @@ function saveSession(){
     }
     entries.push({name:n,sets:sets});
     sets.forEach(function(s,idx){
-      if(cardio)rows.push([DATA.date,r.name,n,idx+1,0,parseFloat(s.minutes),0,0,currentUser,sid]);
-      else{var w=parseFloat(s.w),rp=parseInt(s.r);rows.push([DATA.date,r.name,n,idx+1,w,rp,s.restSec||0,w*rp,currentUser,sid])}
+      if(cardio)rows.push([sd,r.name,n,idx+1,0,parseFloat(s.minutes),0,0,currentUser,sid]);
+      else{var w=parseFloat(s.w),rp=parseInt(s.r);rows.push([sd,r.name,n,idx+1,w,rp,s.restSec||0,w*rp,currentUser,sid])}
     });
   });
   if(!entries.length){showToast('Ingresa datos en al menos una serie.');return}
-  var log={id:sid,date:DATA.date,routine:r.name,entries:entries};DATA.logs.push(log);cacheLogs();
+  var log={id:sid,date:sd,routine:r.name,entries:entries};DATA.logs.push(log);cacheLogs();
   saveCloud();DATA.inSession=false;wakeOff();clearDraft();initDraft();
   sendRows(rows,log);
   DATA.tab='h';DATA.edit=null;render();window.scrollTo(0,0);
