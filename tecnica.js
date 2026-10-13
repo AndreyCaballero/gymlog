@@ -119,3 +119,33 @@ function tecBtn(){
 }
 (function(){var r0=render;render=function(){var x=r0.apply(this,arguments);tecBtn();return x}})();
 tecBtn();
+
+/* ---------- deslizar para cambiar de pestaña ---------- */
+(function(){
+  var ORDER=['t','r','p','h'],sx=0,sy=0,st=0,ok=false;
+  function blocked(el){
+    var ids=['modal-overlay','custom-confirm-overlay','onb','skip','tec','swp','splash'];
+    for(var i=0;i<ids.length;i++){var e=document.getElementById(ids[i]);if(e&&getComputedStyle(e).display!=='none')return true}
+    for(;el&&el!==document.body;el=el.parentElement){
+      if(/^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName)||(el.classList&&(el.classList.contains('drag-handle')||el.classList.contains('sortable-chosen'))))return true;
+      if(el.scrollWidth>el.clientWidth+4){var o=getComputedStyle(el).overflowX;if(o==='auto'||o==='scroll')return true}
+    }
+    return false;
+  }
+  document.addEventListener('touchstart',function(e){
+    if(e.touches.length!==1){ok=false;return}
+    var t=e.touches[0];sx=t.clientX;sy=t.clientY;st=Date.now();
+    ok=sx>24&&sx<window.innerWidth-24&&!blocked(e.target);
+  },{passive:true});
+  document.addEventListener('touchend',function(e){
+    if(!ok)return;ok=false;
+    var t=e.changedTouches[0],dx=t.clientX-sx,dy=t.clientY-sy;
+    if(Date.now()-st>700||Math.abs(dx)<70||Math.abs(dx)<Math.abs(dy)*1.8)return;
+    try{
+      var i=ORDER.indexOf(DATA.tab);if(i<0)return;
+      var j=dx<0?i+1:i-1;if(j<0||j>=ORDER.length)return;
+      setTab(ORDER[j]);window.scrollTo(0,0);
+      if(navigator.vibrate)navigator.vibrate(8);
+    }catch(x){}
+  },{passive:true});
+})();
