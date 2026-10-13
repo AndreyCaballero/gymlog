@@ -449,13 +449,13 @@ for(var i=0;i<R.length;i++)if(R[i][1].test(s))return R[i][0];
 return 'Otro';
 }
 var CAT={};
-function setCat(list){var m={};list.forEach(function(a){m[a[0]]={sug:a[1],g:normG(a[2]),sec:(a[3]||[]).map(normG),pat:a[4],eq:a[5],carga:a[6]||'Peso externo',inc:+a[7]||0,rmin:+a[8]||0,rmax:+a[9]||0}});CAT=m}
+function setCat(list){var m={};list.forEach(function(a){m[a[0]]={sug:a[1],g:normG(a[2]),sec:(a[3]||[]).map(normG),pat:a[4],eq:a[5],carga:a[6]||'Peso externo',inc:+a[7]||0,rmin:+a[8]||0,rmax:+a[9]||0,tips:a[10]||[]}});CAT=m}
 setCat(DEFAULT_CAT);
 function loadCatalog(manual){
 try{var c=JSON.parse(localStorage.getItem('gymlog_cat'));if(c&&c.length&&!manual)setCat(c)}catch(e){}
 if(!HAS_GS){if(manual)showToast('Sin conexión a Sheets');return}
 GS.run.withSuccessHandler(function(j){try{
-var l=JSON.parse(j).map(function(x){return[x.name,x.sug,x.grupo,String(x.gsec||'').split(/[;,]/).map(function(t){return t.trim()}).filter(Boolean),x.patron,x.equipo,x.carga,x.inc,x.rmin,x.rmax]});
+var l=JSON.parse(j).map(function(x){return[x.name,x.sug,x.grupo,String(x.gsec||'').split(/[;,]/).map(function(t){return t.trim()}).filter(Boolean),x.patron,x.equipo,x.carga,x.inc,x.rmin,x.rmax,String(x.tips||'').split('|').map(function(t){return t.trim()}).filter(Boolean)]});
 if(l.length){setCat(l);try{localStorage.setItem('gymlog_cat',JSON.stringify(l))}catch(e){}}
 if(manual){showToast('Catálogo actualizado: '+Object.keys(CAT).length+' ejercicios');render()}
 }catch(e){}}).withFailureHandler(function(){if(manual)showToast('No se pudo leer la hoja Ejercicios')}).getCatalogo();
