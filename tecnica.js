@@ -56,11 +56,17 @@ function swOpen(ri,ei){
   SW={ri:ri,ei:ei,g:muscleOf(cur),q:''};
   var o=document.getElementById('swp');o.style.display='block';document.body.style.overflow='hidden';o.scrollTop=0;swDraw();
 }
+function swAdd(ri){
+  var r=DATA.routines[ri];if(!r)return;var cnt={},best='Todos',mx=0;
+  if(isCardio(r))best='Cardio';else{r.ex.forEach(function(n){var g=muscleOf(n);cnt[g]=(cnt[g]||0)+1;if(cnt[g]>mx){mx=cnt[g];best=g}})}
+  SW={ri:ri,ei:-1,g:best,q:''};
+  var o=document.getElementById('swp');o.style.display='block';document.body.style.overflow='hidden';o.scrollTop=0;swDraw();
+}
 function swNames(){var m={};Object.keys(CAT).forEach(function(k){m[k]=1});try{getAllEx().forEach(function(k){m[k]=1})}catch(e){}return Object.keys(m)}
 function swDraw(){
-  var r=DATA.routines[SW.ri],cur=r.ex[SW.ei],o=document.getElementById('swp');
+  var r=DATA.routines[SW.ri],cur=r.ex[SW.ei]||'',o=document.getElementById('swp');
   var gs=['Todos'].concat(MUSCLES);
-  var h='<div class="tec-top"><button onclick="swClose()" aria-label="Cerrar">‹</button><span>CAMBIAR EJERCICIO</span></div><div class="tec-in"><p class="sw-cur">Reemplazar: <b style="color:#fff">'+esc(cur)+'</b> · en <b style="color:#fff">'+esc(r.name)+'</b></p>';
+  var h='<div class="tec-top"><button onclick="swClose()" aria-label="Cerrar">‹</button><span>'+(SW.ei<0?'AÑADIR EJERCICIOS':'CAMBIAR EJERCICIO')+'</span></div><div class="tec-in"><p class="sw-cur">'+(SW.ei<0?'Añadir a: <b style="color:#fff">'+esc(r.name)+'</b> · '+r.ex.length+' ejercicios':'Reemplazar: <b style="color:#fff">'+esc(cur)+'</b> · en <b style="color:#fff">'+esc(r.name)+'</b>')+'</p>';
   h+='<div class="sw-top"><input id="sw-q" placeholder="Buscar ejercicio…" value="'+esc(SW.q)+'" oninput="SW.q=this.value;swList()"></div>';
   h+='<div class="sw-ch">'+gs.map(function(g){return'<button class="'+(SW.g===g?'on':'')+'" onclick="SW.g=\''+g+'\';swDraw()">'+g+'</button>'}).join('')+'</div><div id="sw-list"></div></div>';
   o.innerHTML=h;swList();
@@ -68,12 +74,20 @@ function swDraw(){
 function swList(){
   var r=DATA.routines[SW.ri],q=SW.q.trim().toLowerCase(),box=document.getElementById('sw-list');
   var l=swNames().filter(function(n){return n!==r.ex[SW.ei]&&r.ex.indexOf(n)<0&&(q?n.toLowerCase().indexOf(q)>-1:(SW.g==='Todos'||muscleOf(n)===SW.g))}).sort();
-  var h=l.map(function(n,i){var c=CAT[n];return'<div class="sw-it"><span>'+esc(n)+'<small>'+esc(muscleOf(n))+(c&&c.eq?' · '+esc(c.eq):'')+'</small></span><button data-n="'+esc(n)+'" onclick="swPick(this.dataset.n)">Elegir</button></div>'}).join('');
-  if(q&&swNames().map(function(x){return x.toLowerCase()}).indexOf(q)<0)h+='<div class="sw-it"><span>Usar «'+esc(SW.q.trim())+'»<small>Ejercicio nuevo, grupo: '+(SW.g==='Todos'?'se calcula solo':esc(SW.g))+'</small></span><button data-n="'+esc(SW.q.trim())+'" onclick="swPick(this.dataset.n,true)">Usar</button></div>';
+  var h=l.map(function(n,i){var c=CAT[n];return'<div class="sw-it"><span>'+esc(n)+'<small>'+esc(muscleOf(n))+(c&&c.eq?' · '+esc(c.eq):'')+'</small></span><button data-n="'+esc(n)+'" onclick="swPick(this.dataset.n)">'+(SW.ei<0?'Añadir':'Elegir')+'</button></div>'}).join('');
+  if(q&&swNames().map(function(x){return x.toLowerCase()}).indexOf(q)<0)h+='<div class="sw-it"><span>Usar «'+esc(SW.q.trim())+'»<small>Ejercicio nuevo, grupo: '+(SW.g==='Todos'?'se calcula solo':esc(SW.g))+'</small></span><button data-n="'+esc(SW.q.trim())+'" onclick="swPick(this.dataset.n,true)">'+(SW.ei<0?'Añadir':'Usar')+'</button></div>';
   box.innerHTML=h||'<p class="tec-ld">No hay ejercicios con ese filtro. Prueba con «Todos».</p>';
 }
 function swPick(n,isNew){
   var r=DATA.routines[SW.ri],old=r.ex[SW.ei];n=String(n).trim();if(!n)return;
+  if(SW.ei<0){
+    if(r.ex.indexOf(n)>-1)return;
+    r.ex.push(n);
+    if(!CAT[n]&&!DATA.muscles[n])DATA.muscles[n]=(isNew&&SW.g!=='Todos')?SW.g:guessMuscle(n);
+    if(SW.ri===DATA.rid&&!DATA.inSession)initDraft();
+    saveCloud();render();showToast('Añadido: '+n,2500);
+    SW.q='';swDraw();return;
+  }
   r.ex[SW.ei]=n;
   if(!CAT[n]&&!DATA.muscles[n])DATA.muscles[n]=(isNew&&SW.g!=='Todos')?SW.g:guessMuscle(n);
   if(SW.ri===DATA.rid&&DATA.inSession){
@@ -94,6 +108,7 @@ function tecBtn(){
     }
     document.querySelectorAll('[id^="exercises-list-"]').forEach(function(list){
       var ri=parseInt(list.id.replace('exercises-list-',''));
+      if(!list.parentNode.querySelector('.swadd-'+ri)){var ab=document.createElement('button');ab.className='sm swadd-'+ri;ab.style.cssText='width:100%;margin-top:12px;padding:12px';ab.textContent='+ Elegir ejercicio de la lista';ab.onclick=function(){swAdd(ri)};list.parentNode.insertBefore(ab,list.nextSibling)}
       list.querySelectorAll('.ex-row').forEach(function(row,ei){
         if(row.querySelector('.swbtn'))return;
         var c=document.createElement('button');c.className='swbtn';c.innerHTML='⇄';c.title='Cambiar ejercicio';c.onclick=function(){swOpen(ri,ei)};
