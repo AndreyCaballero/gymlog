@@ -40,7 +40,7 @@ var TEC={
 var TECSTATE={};
 function tecClose(){document.getElementById('tec').style.display='none';document.body.style.overflow=''}
 function openTec(n){
-  var c=CAT[n]||{sec:[],eq:'',carga:'',rmin:0,rmax:0},t=(TEC[n]&&TEC[n].t)||[],rg=rangeFor(n),o=document.getElementById('tec');
+  var c=CAT[n]||{sec:[],eq:'',carga:'',rmin:0,rmax:0},t=(c.tips&&c.tips.length)?c.tips:((TEC[n]&&TEC[n].t)||[]),rg=rangeFor(n),o=document.getElementById('tec');
   var h='<div class="tec-top"><button onclick="tecClose()" aria-label="Volver">‹</button><span>DETALLES DEL EJERCICIO</span></div><div class="tec-in"><h1>'+esc(n).toUpperCase()+'</h1><p class="tec-g">Grupo muscular: <b>'+esc(muscleOf(n))+'</b></p>';
   h+='<div class="tec-mus2"><h3>MÚSCULO PRINCIPAL</h3><div class="tmb p"><i></i>'+esc(muscleOf(n))+'</div>'+(c.sec.length?'<h3>MÚSCULOS SECUNDARIOS</h3>'+c.sec.map(function(s){return'<div class="tmb s"><i></i>'+esc(s)+'</div>'}).join(''):'')+'</div>';
   h+='<div class="tec-st"><div><b>'+esc(c.eq||'—')+'</b><small>Equipo</small></div><div><b>'+esc(c.carga||'—')+'</b><small>Carga</small></div><div><b>'+rg[0]+'–'+rg[1]+'</b><small>Reps</small></div></div>';
