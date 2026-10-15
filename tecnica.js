@@ -42,7 +42,8 @@ function tecClose(){document.getElementById('tec').style.display='none';document
 function openTec(n){
   var c=CAT[n]||{sec:[],eq:'',carga:'',rmin:0,rmax:0},t=(c.tips&&c.tips.length)?c.tips:((TEC[n]&&TEC[n].t)||[]),rg=rangeFor(n),o=document.getElementById('tec');
   var h='<div class="tec-top"><button onclick="tecClose()" aria-label="Volver">‹</button><span>DETALLES DEL EJERCICIO</span></div><div class="tec-in"><h1>'+esc(n).toUpperCase()+'</h1><p class="tec-g">Grupo muscular: <b>'+esc(muscleOf(n))+'</b></p>';
-  h+='<div class="tec-mus2"><h3>MÚSCULO PRINCIPAL</h3><div class="tmb p"><i></i>'+esc(muscleOf(n))+'</div>'+(c.sec.length?'<h3>MÚSCULOS SECUNDARIOS</h3>'+c.sec.map(function(s){return'<div class="tmb s"><i></i>'+esc(s)+'</div>'}).join(''):'')+'</div>';
+  var dets=c.det?String(c.det).replace(/ y /g,',').split(',').map(function(x){x=x.trim();return x.charAt(0).toUpperCase()+x.slice(1)}).filter(Boolean):c.sec;
+  h+='<div class="tec-mus2"><h3>MÚSCULO PRINCIPAL</h3><div class="tmb p"><i></i>'+esc(c.pr||muscleOf(n))+'</div>'+(dets.length?'<h3>MÚSCULOS SECUNDARIOS</h3>'+dets.map(function(s){return'<div class="tmb s"><i></i>'+esc(s)+'</div>'}).join(''):'')+'</div>';
   h+='<div class="tec-st"><div><b>'+esc(c.eq||'—')+'</b><small>Equipo</small></div><div><b>'+esc(c.carga||'—')+'</b><small>Carga</small></div><div><b>'+rg[0]+'–'+rg[1]+'</b><small>Reps</small></div></div>';
   h+='<h2>TIPS CLAVE DE EJECUCIÓN</h2>'+(t.length?t.map(function(x,i){return'<div class="tec-tip"><b>'+(i+1)+'</b><span>'+esc(x)+'</span></div>'}).join(''):'<p class="tec-ld">Aún no hay consejos para este ejercicio.</p>');
   h+='<div style="height:70px"></div></div><div class="tec-cta"><button onclick="tecClose()">Volver a mi serie</button></div>';
@@ -214,4 +215,42 @@ var HS={open:{},n:20,rt:'',q:''};
     else h+='<p class="hint" style="text-align:center">Historial completo cargado</p>';
     return h;
   };
+})();
+
+/* ---------- Grupos musculares: reglas más completas y corrección única de datos ---------- */
+(function(){
+  var oldGuess=guessMuscle;
+  var R=[
+    ['Pantorrillas',/talones|pantorrilla|gemelo|elevaci[oó]n de puntas/],
+    ['Core',/abdom|rueda|\babs\b|plancha|\bcore\b|crunch|russian|pallof|le[nñ]ador|dead bug|bird dog|escalador|elevaci[oó]n de (piernas|rodillas)|bicicleta abdominal|rotaci[oó]n de torso/],
+    ['Cardio',/caminadora|el[ií]ptica|baile|escalera|bici|cardio|trote|correr|nataci|f[uú]tbol|salto de cuerda|burpee|remo ergo|remo erg[oó]|ciclismo|caminata(?! lateral)|nadar|spinning|boxeo/],
+    ['Glúteos',/gl[uú]teo|hip ?thrust|puente|abducci[oó]n|patada de gl|extensi[oó]n de cadera|caminata lateral/],
+    ['Espalda',/peso muerto convencional/],
+    ['Piernas',/prensa|sentadilla|zancada|femoral|cu[aá]dr|aductor|pierna|peso muerto|hack|b[uú]lgara|subida al caj|buenos d[ií]as|isquio/],
+    ['Pecho',/fondos.*pecho|pecho.*fondos/],
+    ['Tríceps',/tr[ií]ceps|copa|franc[eé]s|fondos|press cerrado|flexiones diamante/],
+    ['Hombros',/hombro|militar|\blaterales?\b|reverse|face ?pull|arnold|cruce de poleas inverso|al ment[oó]n|p[aá]jaro|frontal|elevaci[oó]n en y|rotaci[oó]n externa|manguito/],
+    ['Bíceps',/curl|b[ií]ceps|martillo|predicador|zottman/],
+    ['Espalda',/jal[oó]n|remo|dominad|pull(?!over)|pullover|espalda|lumbar|hiperext|encogim|trapecio/],
+    ['Pecho',/press|peck|pecho|apertura|cruce|banca|fly|flexion/]
+  ];
+  guessMuscle=function(n){
+    var s=String(n).toLowerCase();
+    for(var i=0;i<R.length;i++)if(R[i][1].test(s))return R[i][0];
+    return 'Otro';
+  };
+  function fix(){
+    var key='gymlog_musfix1_'+(typeof currentUser!=='undefined'?currentUser:'');
+    try{if(localStorage.getItem(key))return}catch(e){}
+    var n=0,M=DATA.muscles||{};
+    Object.keys(M).forEach(function(k){
+      var v=normG(M[k]);
+      if(CAT[k]){if(v!==CAT[k].g){delete M[k];n++}}
+      else if(v===normG(oldGuess(k))&&guessMuscle(k)!==v){M[k]=guessMuscle(k);n++}
+    });
+    try{localStorage.setItem(key,'1')}catch(e){}
+    if(n){saveCloud();render();showToast('Corregí '+n+' grupo'+(n===1?'':'s')+' muscular'+(n===1?'':'es'),4000)}
+  }
+  var f0=finishLoad;finishLoad=function(){try{fix()}catch(e){}return f0.apply(this,arguments)};
+  var s0=setCat;setCat=function(){var x=s0.apply(this,arguments);try{if(DATA._ld)fix()}catch(e){}return x};
 })();
