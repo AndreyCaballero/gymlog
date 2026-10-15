@@ -254,3 +254,154 @@ var HS={open:{},n:20,rt:'',q:''};
   var f0=finishLoad;finishLoad=function(){try{fix()}catch(e){}return f0.apply(this,arguments)};
   var s0=setCat;setCat=function(){var x=s0.apply(this,arguments);try{if(DATA._ld)fix()}catch(e){}return x};
 })();
+
+/* ---------- Recomendación diaria según fatiga, carga y pendientes de la semana ---------- */
+(function(){
+  var BASE={'Piernas':3,'Glúteos':2.5,'Espalda':2.5,'Pecho':2,'Hombros':2,'Bíceps':1.5,'Tríceps':1.5,'Pantorrillas':1.5,'Core':1};
+  var SMALL={'Bíceps':.75,'Tríceps':.75,'Pantorrillas':.75,'Core':.75,'Hombros':.9};
+  var OBJT={'Ganar músculo':12,'Fuerza':10,'Recomposición':10,'Perder grasa':9,'Salud y bienestar':8};
+  var COL={g:'#2ecc71',a:'#f5a623',r:'#e63757'};
+  function dn(s){var p=s.split('-');return Math.round(Date.UTC(+p[0],+p[1]-1,+p[2])/86400000)}
+  function ds(n){var d=new Date(n*86400000);return d.getUTCFullYear()+'-'+('0'+(d.getUTCMonth()+1)).slice(-2)+'-'+('0'+d.getUTCDate()).slice(-2)}
+  function dow(n){return (new Date(n*86400000).getUTCDay()+6)%7} /* 0 = lunes */
+  function target(m){var T=OBJT[(DATA.profile&&DATA.profile.obj)||'']||10;return T*(SMALL[m]||1)}
+  function sessM(l){
+    var o={};
+    l.entries.forEach(function(e){
+      var m=muscleOf(e.name);if(MAIN.indexOf(m)<0)return;
+      var n=e.sets.length,v=0;e.sets.forEach(function(s){v+=(+s.w||0)*(+s.r||0)});
+      var x=o[m]=o[m]||{s:0,v:0};x.s+=n;x.v+=v;
+      var c=CAT[e.name];if(c)c.sec.forEach(function(g){if(g!==m&&MAIN.indexOf(g)>-1){var y=o[g]=o[g]||{s:0,v:0};y.s+=n*.5}});
+    });
+    return o;
+  }
+  function isCardioName(n){return String(n||'').toLowerCase()==='cardio'}
+  function e1(s){var w=+s.w||0,r=+s.r||0;return w>0&&r>0?w*(1+r/30):0}
+  function perfDrop(sorted){
+    var last=sorted[sorted.length-1];if(!last)return false;var cmp=0,drop=0;
+    last.entries.forEach(function(e){
+      var cur=0;e.sets.forEach(function(s){cur=Math.max(cur,e1(s))});if(!cur)return;
+      for(var i=sorted.length-2;i>=0;i--){
+        var p=sorted[i].entries.filter(function(x){return x.name===e.name})[0];
+        if(p){var pv=0;p.sets.forEach(function(s){pv=Math.max(pv,e1(s))});if(pv){cmp++;if(cur<pv*.95)drop++}break}
+      }
+    });
+    return cmp>=3&&drop/cmp>=.5;
+  }
+  var LOW={'Piernas':1,'Glúteos':1,'Pantorrillas':1};
+  function recMult(){var m=1,a=+(DATA.profile&&DATA.profile.age)||0,o=(DATA.profile&&DATA.profile.obj)||'';if(a>=50)m*=1.2;else if(a>=40)m*=1.1;if(o==='Perder grasa')m*=1.1;return m}
+  function region(m){var l=0,u=0;Object.keys(m).forEach(function(k){if(LOW[k])l+=m[k].s||m[k];else if(k!=='Core')u+=m[k].s||m[k]});return l>u*1.2?'L':u>l*1.2?'U':'M'}
+  function plan(tStr){
+    var T=dn(tStr),logs=DATA.logs.filter(function(l){return dn(l.date)<T}).sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:0});
+    var per=logs.map(function(l){return{d:dn(l.date),m:sessM(l),r:l.routine,l:l}});
+    var fat={};
+    MAIN.forEach(function(m){
+      var f=0;
+      per.forEach(function(p,i){
+        var x=p.m[m];if(!x||!x.s)return;
+        var age=T-p.d;if(age>5)return;
+        var dose=x.s<=4?.8:x.s<=8?1:x.s<=12?1.2:1.4,lf=1;
+        if(x.v>0){var vs=[];for(var j=0;j<i;j++){var y=per[j].m[m];if(y&&y.v>0&&p.d-per[j].d<=28)vs.push(y.v)}
+          if(vs.length>=2){var avg=vs.reduce(function(a,b){return a+b},0)/vs.length,ra=x.v/avg;lf=ra>1.4?1.3:ra>1.2?1.15:1}}
+        var R=BASE[m]*dose*lf*recMult();f+=Math.min(1.2,dose)*Math.max(0,1-age/R);
+      });
+      fat[m]=Math.min(1.5,f);
+    });
+    logs.forEach(function(l){
+      if(T-dn(l.date)>1)return;var mins=0;
+      if(isCardioName(l.routine))l.entries.forEach(function(e){e.sets.forEach(function(x){mins+=+x.minutes||0})});
+      if(mins>=45){['Piernas','Glúteos','Pantorrillas'].forEach(function(m){fat[m]=Math.min(1.5,fat[m]+.2)})}
+    });
+    var drop=perfDrop(logs.map(function(l){return l}));
+    if(drop)MAIN.forEach(function(m){fat[m]=Math.min(1.5,fat[m]*1.2)});
+    /* pendientes de la semana del día objetivo */
+    var ws=T-dow(T),pw=ws-7,sets={},prev={},days={},mdays={};
+    per.forEach(function(p){
+      if(p.d>=ws){days[p.d]=1;MAIN.forEach(function(m){if(p.m[m]&&p.m[m].s>=1){sets[m]=(sets[m]||0)+p.m[m].s;(mdays[m]=mdays[m]||{})[p.d]=1}})}
+      else if(p.d>=pw){MAIN.forEach(function(m){if(p.m[m])prev[m]=(prev[m]||0)+p.m[m].s})}
+    });
+    var gap={};
+    MAIN.forEach(function(m){gap[m]=Math.max(0,target(m)-(sets[m]||0));if(dow(T)===0)gap[m]+=.5*Math.max(0,target(m)-(prev[m]||0))});
+    var goalDays=+DATA.settings.goal||4,doneDays=Object.keys(days).length;
+    var consec=0;for(var k=T-1;;k--){var has=per.some(function(p){return p.d===k});if(has)consec++;else break;if(consec>14)break}
+    var trainedRecent=0;for(var q=T-4;q<T;q++)if(per.some(function(p){return p.d===q}))trainedRecent++;
+    var wk=0;
+    for(var w=1;w<=12;w++){var a0=ws-7*w,a1=a0+7,dset={};per.forEach(function(p){if(p.d>=a0&&p.d<a1)dset[p.d]=1});if(Object.keys(dset).length>=3)wk++;else break}
+    var lastReg=per.length?region(per[per.length-1].m):'M',rts=[];
+    DATA.routines.forEach(function(r,i){
+      if(isCardio(r)||!r.ex.length)return;
+      var tm={},tot=0;
+      r.ex.forEach(function(n){
+        var m=muscleOf(n);if(MAIN.indexOf(m)<0)return;
+        tm[m]=(tm[m]||0)+3;tot+=3;
+        var c=CAT[n];if(c)c.sec.forEach(function(g){if(g!==m&&MAIN.indexOf(g)>-1)tm[g]=(tm[g]||0)+1.5});
+      });
+      var sc=0,focus=[],reds=[];
+      Object.keys(tm).forEach(function(m){
+        var f=fat[m],w=f<.15?1:f<.5?.5:0,nd=mdays[m]?Object.keys(mdays[m]).length:0,u=Math.min(tm[m],gap[m])*w*(nd===0?1.2:nd===1?1.1:1);
+        sc+=u;if(f>=.5){sc-=.5*tm[m];reds.push(m)}else if(u>0&&f<.15)focus.push([m,u]);
+      });
+      var big=Object.keys(tm).filter(function(m){return tm[m]>=3}).length;
+      if(goalDays>=4&&big>=7)sc*=.75;
+      var rg=region(tm);if(lastReg!=='M'&&rg!=='M'&&rg!==lastReg)sc*=1.1;
+      focus.sort(function(a,b){return b[1]-a[1]});
+      rts.push({i:i,r:r,sc:sc,tot:tot,focus:focus.map(function(x){return x[0]}),reds:reds,ms:Object.keys(tm)});
+    });
+    rts.sort(function(a,b){return b.sc-a.sc});
+    var best=rts[0]||null,rest='';
+    if(best&&best.reds.length){var alt0=rts.filter(function(x){return !x.reds.length&&x.sc>=.6*best.sc})[0];if(alt0){rts.splice(rts.indexOf(alt0),1);rts.unshift(alt0);best=alt0}}
+    if(consec>=3)rest='Llevas '+consec+' días seguidos entrenando.';
+    else if(drop&&trainedRecent>=3)rest='Bajaste cargas en varios ejercicios de la última sesión: señal de fatiga acumulada.';
+    else if(best&&best.sc<.35*best.tot){var rl=MAIN.filter(function(m){return fat[m]>=.5});rest='Tus músculos aún se están recuperando'+(rl.length?' ('+rl.join(', ')+')':'')+'.'}
+    return {deload:wk>=5,wk:wk,T:T,fat:fat,gap:gap,best:best,alt:rts[1]||null,rest:rest,drop:drop,goalMet:doneDays>=goalDays,doneDays:doneDays,goalDays:goalDays,last:per[per.length-1]||null};
+  }
+  function when(last,T){
+    if(!last)return '';var d=T-last.d;
+    var ms=Object.keys(last.m).filter(function(m){return last.m[m].s>=2}).sort(function(a,b){return last.m[b].s-last.m[a].s}).slice(0,3);
+    var cw=d<=0?'Hoy':d===1?'Ayer':'Hace '+d+' días';if(isCardioName(last.r))return cw+' hiciste cardio';
+    return cw+' trabajaste '+(ms.join(', ')||'varios músculos');
+  }
+  function reason(p){
+    var b=p.best,t=[];
+    if(p.last)t.push(when(p.last,p.T)+'.');
+    if(p.rest){t.push(p.rest+' Hoy toca descanso o cardio suave.');if(p.deload)t.push('Además llevas '+p.wk+' semanas seguidas con 3 o más días: una semana de descarga ayudaría.');return t.join(' ')}
+    if(!b)return '';
+    if(p.drop)t.push('Hubo señales de fatiga: mantén cargas moderadas.');
+    t.push('Te recomiendo '+b.r.name+(b.focus.length?': trabaja '+b.focus.slice(0,3).join(', ')+', que están recuperados y con series pendientes esta semana.':'.'));
+    var rs=MAIN.filter(function(m){return p.fat[m]>=.5});
+    if(rs.length)t.push('Siguen descansando: '+rs.join(', ')+'.');
+    if(p.goalMet)t.push('Ya cumpliste tu meta de días; esto sería un extra.');
+    if(p.deload)t.push('Llevas '+p.wk+' semanas seguidas entrenando 3 o más días: considera una semana de descarga (alrededor de la mitad de las series, con los mismos pesos).');
+    return t.join(' ');
+  }
+  /* "Progreso": rutina para empezar la próxima semana */
+  var rec0=recommend;
+  recommend=function(w,need){
+    try{
+      var t=ds(dn(fmtD(w.end))+1),p=plan(t);
+      if(p.best)return {r:p.best.r,sc:p.best.sc,ms:p.best.focus};
+    }catch(e){}
+    return rec0.apply(this,arguments);
+  };
+  /* Tarjeta en Entrenar */
+  function card(){
+    var old=document.getElementById('rc-card');if(old)old.remove();
+    if(DATA.tab!=='t'||DATA.inSession||!DATA.logs.length)return;
+    var hs=document.querySelectorAll('#app h2,h2'),anchor=null;
+    for(var i=0;i<hs.length;i++)if(/Qu[eé] vamos a entrenar/.test(hs[i].textContent)){anchor=hs[i].parentNode;break}
+    if(!anchor)return;
+    var td=today(),T0=dn(td),did=DATA.logs.some(function(l){return l.date===td})||(DATA.skips&&DATA.skips[td]);
+    var tgt=did?T0+1:T0,p=plan(ds(tgt)),title=did?(dow(tgt)===0?'Para empezar la semana':'Mañana te recomiendo'):'Hoy te recomiendo';
+    var main=p.rest?'Descanso o cardio suave':(p.best?p.best.r.name:'—');
+    var h='<div class="hint" style="margin:0 0 2px;font-weight:700;letter-spacing:.05em">'+title.toUpperCase()+'</div><h2 style="margin:0 0 6px">'+esc(main)+'</h2><p style="font-size:14px;line-height:1.4;margin:0 0 10px">'+esc(reason(p))+'</p>';
+    h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">'+MAIN.map(function(m){var f=p.fat[m],c=f>=.5?COL.r:f>=.15?COL.a:COL.g;return'<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:3px 8px;border-radius:12px;background:var(--acs)"><i style="width:8px;height:8px;border-radius:50%;background:'+c+'"></i>'+esc(m)+'</span>'}).join('')+'</div>';
+    h+='<div class="hint" style="margin:0 0 10px">Verde: listo · Ámbar: casi · Rojo: descansando</div>';
+    if(p.best&&!p.rest&&!did)h+='<button class="p" style="margin:0" onclick="DATA.rid='+p.best.i+';initDraft();render()">Usar '+esc(p.best.r.name)+'</button>';
+    else if(p.best&&p.rest&&!did)h+='<button style="margin:0" onclick="DATA.rid='+p.best.i+';initDraft();render()">Entrenar igual con '+esc(p.best.r.name)+'</button>';
+    if(T0>=0&&dow(T0)===6&&!did){var pm=plan(ds(T0+1));if(pm.best)h+='<p class="hint" style="margin:10px 0 0">Para empezar la semana: <b>'+esc(pm.best.r.name)+'</b></p>'}
+    var el=document.createElement('div');el.className='card';el.id='rc-card';el.innerHTML=h;anchor.parentNode.insertBefore(el,anchor);
+  }
+  window.rcPlan=plan;
+  var r1=render;render=function(){var x=r1.apply(this,arguments);try{card()}catch(e){}return x};
+  try{card()}catch(e){}
+})();
