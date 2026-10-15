@@ -449,13 +449,13 @@ for(var i=0;i<R.length;i++)if(R[i][1].test(s))return R[i][0];
 return 'Otro';
 }
 var CAT={};
-function setCat(list){var m={};list.forEach(function(a){m[a[0]]={sug:a[1],g:normG(a[2]),sec:(a[3]||[]).map(normG),pat:a[4],eq:a[5],carga:a[6]||'Peso externo',inc:+a[7]||0,rmin:+a[8]||0,rmax:+a[9]||0,tips:a[10]||[]}});CAT=m}
+function setCat(list){var m={};list.forEach(function(a){m[a[0]]={sug:a[1],g:normG(a[2]),sec:(a[3]||[]).map(normG),pat:a[4],eq:a[5],carga:a[6]||'Peso externo',inc:+a[7]||0,rmin:+a[8]||0,rmax:+a[9]||0,tips:a[10]||[],pr:a[11]||'',det:a[12]||''}});CAT=m}
 setCat(DEFAULT_CAT);
 function loadCatalog(manual){
 try{var c=JSON.parse(localStorage.getItem('gymlog_cat'));if(c&&c.length&&!manual)setCat(c)}catch(e){}
 if(!HAS_GS){if(manual)showToast('Sin conexión a Sheets');return}
 GS.run.withSuccessHandler(function(j){try{
-var l=JSON.parse(j).map(function(x){return[x.name,x.sug,x.grupo,String(x.gsec||'').split(/[;,]/).map(function(t){return t.trim()}).filter(Boolean),x.patron,x.equipo,x.carga,x.inc,x.rmin,x.rmax,String(x.tips||'').split('|').map(function(t){return t.trim()}).filter(Boolean)]});
+var l=JSON.parse(j).map(function(x){return[x.name,x.sug,x.grupo,String(x.gsec||'').split(/[;,]/).map(function(t){return t.trim()}).filter(Boolean),x.patron,x.equipo,x.carga,x.inc,x.rmin,x.rmax,String(x.tips||'').split('|').map(function(t){return t.trim()}).filter(Boolean),x.principal||'',x.sec||'']});
 if(l.length){setCat(l);try{localStorage.setItem('gymlog_cat',JSON.stringify(l))}catch(e){}}
 if(manual){showToast('Catálogo actualizado: '+Object.keys(CAT).length+' ejercicios');render()}
 }catch(e){}}).withFailureHandler(function(){if(manual)showToast('No se pudo leer la hoja Ejercicios')}).getCatalogo();
@@ -883,7 +883,7 @@ h+='<div class="card" id="ex-active"><div class="row"><h2 class="grow">'+esc(n)+
 if(!cardio)h+='<select style="width:92px" onchange="setRest('+i+',this.value)">'+[45,60,90,120,180].map(function(v){return'<option value="'+v+'"'+(v===rest?' selected':'')+'>'+v+'s</option>'}).join('')+'</select>';
 h+='</div>';
 var cg=CAT[n];
-h+='<div class="row" style="flex-wrap:wrap;gap:6px;margin:0 0 8px"><span class="chip">'+esc(muscleOf(n))+'</span>'+(cg&&cg.carga!=='Peso externo'&&cg.carga!=='Tiempo'?'<span class="chip">'+esc(cg.carga)+'</span>':'')+(cg&&cg.sec.length?'<span class="mu2">+ '+esc(cg.sec.join(', '))+' (½)</span>':'')+'</div>';
+h+='<div class="row" style="flex-wrap:wrap;gap:6px;margin:0 0 8px"><span class="chip">'+esc(muscleOf(n))+'</span>'+(cg&&cg.carga!=='Peso externo'&&cg.carga!=='Tiempo'?'<span class="chip">'+esc(cg.carga)+'</span>':'')+'</div>'+(cg&&(cg.pr||cg.det||cg.sec.length)?'<div class="mu2" style="margin:-2px 0 8px;line-height:1.5">'+(cg.pr?'Músculo principal: <b>'+esc(cg.pr)+'</b>':'')+((cg.det||cg.sec.length)?(cg.pr?'<br>':'')+'Músculo secundario: <b>'+esc(cg.det||cg.sec.join(', '))+'</b>':'')+'</div>':'');
 if(ls){
 h+='<div class="hint">Última vez: '+ls.map(function(s){return sTxt(n,s)}).join(' · ')+'</div>';
 if(sg)h+='<div class="sug">'+sg.txt+'</div>';
