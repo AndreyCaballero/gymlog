@@ -359,15 +359,17 @@ var HS={open:{},n:20,rt:'',q:''};
     if(!last)return '';var d=T-last.d;
     var ms=Object.keys(last.m).filter(function(m){return last.m[m].s>=2}).sort(function(a,b){return last.m[b].s-last.m[a].s}).slice(0,3);
     var cw=d<=0?'Hoy':d===1?'Ayer':'Hace '+d+' días';if(isCardioName(last.r))return cw+' hiciste cardio';
-    return cw+' trabajaste '+(ms.join(', ')||'varios músculos');
+    return cw+' entrenaste '+(ms.join(', ')||'varios músculos');
   }
   function reason(p){
     var b=p.best,t=[];
-    if(p.last)t.push(when(p.last,p.T)+'.');
-    if(p.rest){t.push(p.rest+' Hoy toca descanso o cardio suave.');if(p.deload)t.push('Además llevas '+p.wk+' semanas seguidas con 3 o más días: una semana de descarga ayudaría.');return t.join(' ')}
+    var D=p.dayWord||'Hoy';
+    if(p.skipToday)t.push('Hoy marcaste que no entrenas.');
+    if(p.last)t.push(when(p.last,p.ref!=null?p.ref:p.T)+'.');
+    if(p.rest){t.push(p.rest+' '+D+' toca descanso o cardio suave.');if(p.deload)t.push('Además llevas '+p.wk+' semanas seguidas con 3 o más días: una semana de descarga ayudaría.');return t.join(' ')}
     if(!b)return '';
     if(p.drop)t.push('Hubo señales de fatiga: mantén cargas moderadas.');
-    t.push('Te recomiendo '+b.r.name+(b.focus.length?': trabaja '+b.focus.slice(0,3).join(', ')+', que están recuperados y con series pendientes esta semana.':'.'));
+    t.push((D==='Mañana'?'Para mañana te recomiendo ':'Te recomiendo ')+b.r.name+(b.focus.length?': trabaja '+b.focus.slice(0,3).join(', ')+', que están recuperados y con series pendientes esta semana.':'.'));
     var rs=MAIN.filter(function(m){return p.fat[m]>=.5});
     if(rs.length)t.push('Siguen descansando: '+rs.join(', ')+'.');
     if(p.goalMet)t.push('Ya cumpliste tu meta de días; esto sería un extra.');
@@ -391,7 +393,7 @@ var HS={open:{},n:20,rt:'',q:''};
     for(var i=0;i<hs.length;i++)if(/Qu[eé] vamos a entrenar/.test(hs[i].textContent)){anchor=hs[i].parentNode;break}
     if(!anchor)return;
     var td=today(),T0=dn(td),did=DATA.logs.some(function(l){return l.date===td})||(DATA.skips&&DATA.skips[td]);
-    var tgt=did?T0+1:T0,p=plan(ds(tgt)),title=did?(dow(tgt)===0?'Para empezar la semana':'Mañana te recomiendo'):'Hoy te recomiendo';
+    var skipT=!!(DATA.skips&&DATA.skips[td]&&!DATA.logs.some(function(l){return l.date===td})),tgt=did?T0+1:T0,p=plan(ds(tgt));p.ref=T0;p.dayWord=did?'Mañana':'Hoy';p.skipToday=skipT;var _x=0,title=did?(dow(tgt)===0?'Para empezar la semana':'Mañana te recomiendo'):'Hoy te recomiendo';
     var main=p.rest?'Descanso o cardio suave':(p.best?p.best.r.name:'—');
     var h='<div class="hint" style="margin:0 0 2px;font-weight:700;letter-spacing:.05em">'+title.toUpperCase()+'</div><h2 style="margin:0 0 6px">'+esc(main)+'</h2><p style="font-size:14px;line-height:1.4;margin:0 0 10px">'+esc(reason(p))+'</p>';
     h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">'+MAIN.map(function(m){var f=p.fat[m],c=f>=.5?COL.r:f>=.15?COL.a:COL.g;return'<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:3px 8px;border-radius:12px;background:var(--acs)"><i style="width:8px;height:8px;border-radius:50%;background:'+c+'"></i>'+esc(m)+'</span>'}).join('')+'</div>';
@@ -399,9 +401,89 @@ var HS={open:{},n:20,rt:'',q:''};
     if(p.best&&!p.rest&&!did)h+='<button class="p" style="margin:0" onclick="DATA.rid='+p.best.i+';initDraft();render()">Usar '+esc(p.best.r.name)+'</button>';
     else if(p.best&&p.rest&&!did)h+='<button style="margin:0" onclick="DATA.rid='+p.best.i+';initDraft();render()">Entrenar igual con '+esc(p.best.r.name)+'</button>';
     if(T0>=0&&dow(T0)===6&&!did){var pm=plan(ds(T0+1));if(pm.best)h+='<p class="hint" style="margin:10px 0 0">Para empezar la semana: <b>'+esc(pm.best.r.name)+'</b></p>'}
-    var el=document.createElement('div');el.className='card';el.id='rc-card';el.innerHTML=h;anchor.parentNode.insertBefore(el,anchor);
+    var el=document.createElement('div');el.className='card';el.id='rc-card';el.innerHTML=h;anchor.parentNode.insertBefore(el,anchor.nextSibling);
   }
   window.rcPlan=plan;
   var r1=render;render=function(){var x=r1.apply(this,arguments);try{card()}catch(e){}return x};
   try{card()}catch(e){}
+})();
+
+/* ---------- diagnóstico del catálogo en Configuración ---------- */
+(function(){
+  function diag(){
+    try{
+      if(DATA.tab!=='a')return;
+      var n=Object.keys(CAT).length,k=Object.keys(CAT).filter(function(x){return CAT[x].tips&&CAT[x].tips.length}).length;
+      document.querySelectorAll('.cfg span').forEach(function(sp){
+        if(/ejercicios \(hoja Ejercicios\)/.test(sp.textContent)&&!/consejos/.test(sp.textContent))sp.textContent=n+' ejercicios · '+k+' con consejos de la hoja';
+      });
+    }catch(e){}
+  }
+  var r2=render;render=function(){var x=r2.apply(this,arguments);diag();return x};
+})();
+
+/* ---------- Sobrecarga progresiva (doble progresión) ---------- */
+(function(){
+  function dnum(s){var p=String(s).split('-');return Math.round(Date.UTC(+p[0],+p[1]-1,+p[2])/86400000)}
+  function stepR(v,st){return round1(Math.round(v/st)*st)}
+  function hist(name){
+    var h=[];
+    for(var i=DATA.logs.length-1;i>=0&&h.length<4;i--){
+      var e=DATA.logs[i].entries.filter(function(x){return x.name===name})[0];
+      if(!e||!e.sets.length||e.sets[0].minutes!==undefined&&e.sets[0].minutes!=='')continue;
+      var ws=e.sets.map(function(s){return +s.w||0}),rs=e.sets.map(function(s){return +s.r||0});
+      var top=Math.max.apply(null,ws),lo=Math.min.apply(null,ws);
+      var at=e.sets.filter(function(s){return(+s.w||0)===top}),atLo=e.sets.filter(function(s){return(+s.w||0)===lo});
+      var best=0;e.sets.forEach(function(s){best=Math.max(best,e1rm(+s.w||0,+s.r||0))});
+      h.push({date:DATA.logs[i].date,top:top,lo:lo,
+        minTop:Math.min.apply(null,at.map(function(s){return +s.r||0})),
+        sumTop:at.reduce(function(a,s){return a+(+s.r||0)},0),
+        minLo:Math.min.apply(null,atLo.map(function(s){return +s.r||0})),e1:best});
+    }
+    return h;
+  }
+  suggestion=function(name){
+    var h=hist(name);if(!h.length)return null;
+    var L=h[0],rg=rangeFor(name),inc=incFor(name)||2.5,gap=dnum(today())-dnum(L.date);
+    var asi=isAsist(name),bw=isBW(name);
+    /* Asistido: progresar = bajar la asistencia */
+    if(asi){
+      var P=h[1],lw=L.lo;
+      if(L.minLo>=rg[1]&&lw>0){var nw=stepR(Math.max(0,lw-inc),inc);return{w:nw,txt:'⬇ Baja la asistencia a '+nw+' kg × '+rg[0]+'+'}}
+      if(L.minLo<rg[0]&&P&&P.lo===lw&&P.minLo<rg[0]){var up=round1(lw+inc);return{w:up,txt:'↩ Dos sesiones por debajo del rango: sube la asistencia a '+up+' kg y vuelve a bajarla'}}
+      if(L.minLo<rg[0])return{w:lw,txt:'🔁 Repite '+lw+' kg de asistencia y busca '+rg[0]+' reps en todas las series'};
+      return{w:lw,txt:'🎯 Meta: '+lw+' kg de asistencia × '+(L.minLo+1)+' reps en todas las series'};
+    }
+    var top=L.top;
+    /* Peso corporal sin carga extra */
+    if(bw&&!(top>0)){
+      if(L.minTop>=rg[1])return{w:'',txt:'💪 Dominas el rango: añade peso (p. ej. '+inc+' kg) y vuelve a '+rg[0]+' reps'};
+      if(L.minTop<rg[0])return{w:'',txt:'🔁 Repite y busca '+rg[0]+' reps en todas las series'};
+      return{w:'',txt:'🎯 Meta: '+(L.minTop+1)+' reps en todas las series'};
+    }
+    /* Regreso tras una pausa larga */
+    if(gap>=14){
+      var f=gap>=56?.85:gap>=28?.9:.95,rw=stepR(top*f,inc);if(rw>=top)rw=round1(Math.max(inc,top-inc));
+      return{w:rw,txt:'↺ Vuelves tras '+gap+' días: empieza con '+rw+' kg × '+rg[0]+'–'+rg[1]+' y progresa desde ahí'};
+    }
+    var P1=h[1];
+    /* Por debajo del rango */
+    if(L.minTop<rg[0]){
+      if(P1&&P1.top===top&&P1.minTop<rg[0]){var dw=stepR(top*.9,inc);if(dw>=top)dw=round1(Math.max(inc,top-inc));
+        return{w:dw,txt:'⬇ Dos sesiones por debajo del rango: baja a '+dw+' kg × '+rg[0]+'–'+rg[1]+' y vuelve a subir'}}
+      return{w:top,txt:'🔁 Repite '+top+' kg y busca '+rg[0]+' reps en todas las series'};
+    }
+    /* Techo del rango: sube carga */
+    if(L.minTop>=rg[1]){
+      var jump=inc;if(L.minTop>=rg[1]+3)jump=Math.min(2*inc,Math.max(inc,top*.1));
+      var nw2=round1(top+jump),pct=top>0?jump/top:0;
+      return{w:nw2,txt:'⬆ Sube a '+nw2+' kg × '+rg[0]+'+'+(pct>.1?' (salto grande: si no llegas, repite con más reps)':'')};
+    }
+    /* Dentro del rango: mismo peso, más repeticiones */
+    var txt='🎯 Meta: '+top+' kg × '+(L.minTop+1)+' reps en todas las series';
+    var H3=h.slice(0,3);
+    if(H3.length===3&&H3.every(function(x){return x.top===top})&&H3[0].sumTop<=H3[2].sumTop)txt+=' · Estancado 3 sesiones: añade 1 serie o baja ~10 % una semana';
+    else if(H3.length===3&&H3[0].e1<H3[1].e1*.97&&H3[1].e1<H3[2].e1*.97)txt+=' · Tu fuerza viene bajando: revisa descanso o haz una descarga';
+    return{w:top,txt:txt};
+  };
 })();
